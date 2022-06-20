@@ -14,7 +14,7 @@ const baseUri = '' // This will be replaced automatically
 const layerConfigurations = [
   {
     growEditionSizeTo: 1,
-    layersOrder: [{ name: 'background' }, { name: 'V1-AnimatedGold', gif: true }]
+    layersOrder: [{ name: 'Background' }, { name: 'V1-AnimatedGold', gif: true }]
   }
 ]
 
