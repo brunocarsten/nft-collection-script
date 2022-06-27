@@ -319,56 +319,67 @@ const startCreating = async () => {
     while (editionCount <= layerConfigurations[layerConfigIndex].growEditionSizeTo) {
       let newDna = createDna(layers)
 
-      let frames = []
-      layers.map(async (layer) => {
-        if (layer.gif) {
-          layer.elements.map(async (element) => {
-            const frame = {
-              name: layer.name,
-              blend: layer.blend,
-              opacity: layer.opacity,
-              selectedElement: element
-            }
-            frames.push(loadLayerImg(frame))
-          })
-        } else {
-          let results = constructLayerToDna(newDna, layers)
-          results.forEach((layer) => {
-            if (layer != undefined) frames.push(loadLayerImg(layer))
-          })
-        }
-      })
-
-      await Promise.all(frames).then((renderObjectArray) => {
-        ctx.clearRect(0, 0, format.width, format.height)
-
-        hashlipsGiffer = new HashlipsGiffer(
-          canvas,
-          ctx,
-          `${buildDir}/images/${abstractedIndexes[0]}.gif`,
-          gif.repeat,
-          gif.quality,
-          gif.delay
-        )
-        hashlipsGiffer.start()
-
-        renderObjectArray.forEach((renderObject, index) => {
-          if (index === 0) {
-            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+      if (isDnaUnique(dnaList, newDna)) {
+        let frames = []
+        layers.map(async (layer) => {
+          if (layer.gif) {
+            layer.elements.map(async (element) => {
+              const frame = {
+                name: layer.name,
+                blend: layer.blend,
+                opacity: layer.opacity,
+                selectedElement: element
+              }
+              frames.push(loadLayerImg(frame))
+            })
           } else {
-            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
-            hashlipsGiffer.add()
+            let results = constructLayerToDna(newDna, layers)
+            results.forEach((layer) => {
+              if (layer != undefined) frames.push(loadLayerImg(layer))
+            })
           }
         })
-        hashlipsGiffer.stop()
 
-        addMetadata(newDna, abstractedIndexes[0])
-        saveMetaDataSingleFile(abstractedIndexes[0])
-        console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
-      })
-      dnaList.add(filterDNAOptions(newDna))
-      editionCount++
-      abstractedIndexes.shift()
+        await Promise.all(frames).then((renderObjectArray) => {
+          ctx.clearRect(0, 0, format.width, format.height)
+
+          hashlipsGiffer = new HashlipsGiffer(
+            canvas,
+            ctx,
+            `${buildDir}/images/${abstractedIndexes[0]}.gif`,
+            gif.repeat,
+            gif.quality,
+            gif.delay
+          )
+          hashlipsGiffer.start()
+
+          renderObjectArray.forEach((renderObject, index) => {
+            if (index === 0) {
+              drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+            } else {
+              drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+              hashlipsGiffer.add()
+            }
+          })
+          hashlipsGiffer.stop()
+
+          addMetadata(newDna, abstractedIndexes[0])
+          saveMetaDataSingleFile(abstractedIndexes[0])
+          console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
+        })
+        dnaList.add(filterDNAOptions(newDna))
+        editionCount++
+        abstractedIndexes.shift()
+      } else {
+        console.log('DNA exists!')
+        failedCount++
+        if (failedCount >= uniqueDnaTorrance) {
+          console.log(
+            `You need more layers or elements to grow your edition to ${layerConfigurations[layerConfigIndex].growEditionSizeTo} artworks!`
+          )
+          process.exit()
+        }
+      }
 
       // if (isDnaUnique(dnaList, newDna)) {
       //   let results = constructLayerToDna(newDna, layers)
