@@ -31,7 +31,7 @@
     "check_txns": "node utils/nftport/checkTxns %npm_config_dir%",
     "refresh_os": "node utils/functions/refreshOpensea %npm_config_start% %npm_config_end%"
   },
-  "author": "Jesse Hall (codeSTACKr)",
+  "author": "King Ov Deception",
   "license": "MIT",
   "dependencies": {
     "async-sema": "^3.1.1",

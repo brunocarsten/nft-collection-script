@@ -196,13 +196,14 @@ const drawElement = (_renderObject, _index, _layersLen) => {
 
 const constructLayerToDna = (_dna = '', _layers = []) => {
   let mappedDnaToLayers = _layers.map((layer, index) => {
-    const selectedElement = layer.elements.find((e) => e.id == cleanDna(_dna.split(DNA_DELIMITER)[index]))
-
-    return {
-      name: layer.name,
-      blend: layer.blend,
-      opacity: layer.opacity,
-      selectedElement: selectedElement
+    if (!layer.gif) {
+      const selectedElement = layer.elements.find((e) => e.id == cleanDna(_dna.split(DNA_DELIMITER)[index]))
+      return {
+        name: layer.name,
+        blend: layer.blend,
+        opacity: layer.opacity,
+        selectedElement: selectedElement
+      }
     }
   })
   return mappedDnaToLayers
@@ -330,8 +331,14 @@ const startCreating = async () => {
             }
             frames.push(loadLayerImg(frame))
           })
+        } else {
+          let results = constructLayerToDna(newDna, layers)
+          results.forEach((layer) => {
+            if (layer != undefined) frames.push(loadLayerImg(layer))
+          })
         }
       })
+
       await Promise.all(frames).then((renderObjectArray) => {
         ctx.clearRect(0, 0, format.width, format.height)
 
@@ -346,12 +353,15 @@ const startCreating = async () => {
         hashlipsGiffer.start()
 
         renderObjectArray.forEach((renderObject, index) => {
-          drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
-
-          hashlipsGiffer.add()
+          if (index === 0) {
+            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+          } else {
+            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+            hashlipsGiffer.add()
+          }
         })
         hashlipsGiffer.stop()
-        // saveImage(abstractedIndexes[0])
+
         addMetadata(newDna, abstractedIndexes[0])
         saveMetaDataSingleFile(abstractedIndexes[0])
         console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
@@ -401,9 +411,9 @@ const startCreating = async () => {
       //     saveMetaDataSingleFile(abstractedIndexes[0])
       //     console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
       //   })
-      // dnaList.add(filterDNAOptions(newDna))
-      // editionCount++
-      // abstractedIndexes.shift()
+      //   dnaList.add(filterDNAOptions(newDna))
+      //   editionCount++
+      //   abstractedIndexes.shift()
       // } else {
       //   console.log('DNA exists!')
       //   failedCount++

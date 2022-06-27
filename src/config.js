@@ -13,18 +13,18 @@ const baseUri = '' // This will be replaced automatically
 // If you have selected Solana then the collection starts from 0 automatically
 const layerConfigurations = [
   {
-    growEditionSizeTo: 1,
-    layersOrder: [{ name: 'Background' }, { name: 'V1-AnimatedGold', gif: true }]
+    growEditionSizeTo: 20,
+    layersOrder: [{ name: 'background' }, { name: 'Animated Gold', gif: true }]
   }
 ]
-
+/* options: { blend: MODE.overlay } */
 const shuffleLayerConfigurations = false
 
 const debugLogs = false
 
 const format = {
-  width: 512,
-  height: 512,
+  width: 1440,
+  height: 1440,
   smoothing: false
 }
 
@@ -81,7 +81,7 @@ const solanaMetadata = {
 const gif = {
   export: false,
   repeat: 0,
-  quality: 50,
+  quality: 100,
   delay: 0
 }
 
