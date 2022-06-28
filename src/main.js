@@ -40,9 +40,7 @@ const buildSetup = () => {
   fs.mkdirSync(buildDir)
   fs.mkdirSync(`${buildDir}/json`)
   fs.mkdirSync(`${buildDir}/images`)
-  if (gif.export) {
-    fs.mkdirSync(`${buildDir}/gifs`)
-  }
+  // fs.mkdirSync(`${buildDir}/gifs`)
 }
 
 const getRarityWeight = (_str) => {
@@ -81,17 +79,30 @@ const getElements = (path) => {
     })
 }
 
+const getSubElements = (path) => {
+  return fs
+    .readdirSync(path)
+    .filter((item) => !/(^|\/)\.[^\/\.]/g.test(item))
+    .map((i, index) => {
+      return {
+        id: index,
+        name: cleanName(i),
+        filename: i,
+        path: `${path}/${i}`,
+        weight: getRarityWeight(i)
+      }
+    })
+}
+
 const layersSetup = (layersOrder) => {
   const layers = layersOrder.map((layerObj, index) => ({
     id: index,
     elements: getElements(`${layersDir}/${layerObj.name}/`),
-    gif: layerObj.gif != undefined ? layerObj.gif : false,
     name: layerObj.options?.['displayName'] != undefined ? layerObj.options?.['displayName'] : layerObj.name,
     blend: layerObj.options?.['blend'] != undefined ? layerObj.options?.['blend'] : 'source-over',
     opacity: layerObj.options?.['opacity'] != undefined ? layerObj.options?.['opacity'] : 1,
     bypassDNA: layerObj.options?.['bypassDNA'] !== undefined ? layerObj.options?.['bypassDNA'] : false
   }))
-
   return layers
 }
 
@@ -164,9 +175,14 @@ const addAttributes = (_element) => {
   })
 }
 
-const loadLayerImg = async (_layer) => {
+const loadLayerImg = async (_layer, frame = false) => {
   return new Promise(async (resolve) => {
     const image = await loadImage(`${_layer.selectedElement.path}`)
+
+    if (frame) {
+      resolve({ layer: _layer, loadedImage: image, frame: true })
+      return
+    }
     resolve({ layer: _layer, loadedImage: image })
   })
 }
@@ -179,31 +195,22 @@ const addText = (_sig, x, y, size) => {
   ctx.fillText(_sig, x, y)
 }
 
-const drawElement = (_renderObject, _index, _layersLen) => {
+const drawElement = (_renderObject) => {
   ctx.globalAlpha = _renderObject.layer.opacity
   ctx.globalCompositeOperation = _renderObject.layer.blend
-  text.only
-    ? addText(
-        `${_renderObject.layer.name}${text.spacer}${_renderObject.layer.selectedElement.name}`,
-        text.xGap,
-        text.yGap * (_index + 1),
-        text.size
-      )
-    : ctx.drawImage(_renderObject.loadedImage, 0, 0, format.width, format.height)
+  ctx.drawImage(_renderObject.loadedImage, 0, 0, format.width, format.height)
 
   addAttributes(_renderObject)
 }
 
 const constructLayerToDna = (_dna = '', _layers = []) => {
   let mappedDnaToLayers = _layers.map((layer, index) => {
-    if (!layer.gif) {
-      const selectedElement = layer.elements.find((e) => e.id == cleanDna(_dna.split(DNA_DELIMITER)[index]))
-      return {
-        name: layer.name,
-        blend: layer.blend,
-        opacity: layer.opacity,
-        selectedElement: selectedElement
-      }
+    let selectedElement = layer.elements.find((e) => e.id == cleanDna(_dna.split(DNA_DELIMITER)[index]))
+    return {
+      name: layer.name,
+      blend: layer.blend,
+      opacity: layer.opacity,
+      selectedElement: selectedElement
     }
   })
   return mappedDnaToLayers
@@ -321,48 +328,45 @@ const startCreating = async () => {
 
       if (isDnaUnique(dnaList, newDna)) {
         let frames = []
-        layers.map(async (layer) => {
-          if (layer.gif) {
-            layer.elements.map(async (element) => {
-              const frame = {
-                name: layer.name,
-                blend: layer.blend,
-                opacity: layer.opacity,
-                selectedElement: element
-              }
-              frames.push(loadLayerImg(frame))
-            })
+        let results = constructLayerToDna(newDna, layers)
+        let loadedElements = []
+
+        results.forEach((layer) => {
+          if (layer.selectedElement.filename.endsWith('.png')) {
+            loadedElements.push(loadLayerImg(layer))
           } else {
-            let results = constructLayerToDna(newDna, layers)
-            results.forEach((layer) => {
-              if (layer != undefined) frames.push(loadLayerImg(layer))
+            frames = getSubElements(layer.selectedElement.path)
+            frames.forEach((frame) => {
+              layer.selectedElement = frame
+              loadedElements.push(loadLayerImg(layer, true))
             })
           }
         })
-
-        await Promise.all(frames).then((renderObjectArray) => {
+        await Promise.all(loadedElements).then((renderObjectArray) => {
+          debugLogs ? console.log('Clearing canvas') : null
           ctx.clearRect(0, 0, format.width, format.height)
-
-          hashlipsGiffer = new HashlipsGiffer(
-            canvas,
-            ctx,
-            `${buildDir}/images/${abstractedIndexes[0]}.gif`,
-            gif.repeat,
-            gif.quality,
-            gif.delay
-          )
-          hashlipsGiffer.start()
-
+          if (renderObjectArray[1].frame) {
+            hashlipsGiffer = new HashlipsGiffer(
+              canvas,
+              ctx,
+              `${buildDir}/images/${abstractedIndexes[0]}.gif`,
+              gif.repeat,
+              gif.quality,
+              gif.delay
+            )
+            hashlipsGiffer.start()
+          }
           renderObjectArray.forEach((renderObject, index) => {
-            if (index === 0) {
-              drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
-            } else {
-              drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+            if (renderObject.frame) {
               hashlipsGiffer.add()
             }
           })
-          hashlipsGiffer.stop()
-
+          if (renderObjectArray[1].frame) {
+            hashlipsGiffer.stop()
+          }
+          debugLogs ? console.log('Editions left to create: ', abstractedIndexes) : null
+          if (!renderObjectArray[1].frame) saveImage(abstractedIndexes[0])
           addMetadata(newDna, abstractedIndexes[0])
           saveMetaDataSingleFile(abstractedIndexes[0])
           console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
@@ -380,61 +384,6 @@ const startCreating = async () => {
           process.exit()
         }
       }
-
-      // if (isDnaUnique(dnaList, newDna)) {
-      //   let results = constructLayerToDna(newDna, layers)
-
-      //   let loadedElements = []
-
-      //   results.forEach((layer) => {
-      //     loadedElements.push(loadLayerImg(layer))
-      //   })
-
-      //   await Promise.all(loadedElements).then((renderObjectArray) => {
-      //     debugLogs ? console.log('Clearing canvas') : null
-      //     ctx.clearRect(0, 0, format.width, format.height)
-      //     if (gif.export) {
-      //       hashlipsGiffer = new HashlipsGiffer(
-      //         canvas,
-      //         ctx,
-      //         `${buildDir}/gifs/${abstractedIndexes[0]}.gif`,
-      //         gif.repeat,
-      //         gif.quality,
-      //         gif.delay
-      //       )
-      //       hashlipsGiffer.start()
-      //     }
-      //     if (background.generate) {
-      //       drawBackground()
-      //     }
-      //     renderObjectArray.forEach((renderObject, index) => {
-      //       drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
-      //       if (gif.export) {
-      //         hashlipsGiffer.add()
-      //       }
-      //     })
-      //     if (gif.export) {
-      //       hashlipsGiffer.stop()
-      //     }
-      //     debugLogs ? console.log('Editions left to create: ', abstractedIndexes) : null
-      //     saveImage(abstractedIndexes[0])
-      //     addMetadata(newDna, abstractedIndexes[0])
-      //     saveMetaDataSingleFile(abstractedIndexes[0])
-      //     console.log(`Created edition: ${abstractedIndexes[0]}, with DNA: ${sha1(newDna)}`)
-      //   })
-      //   dnaList.add(filterDNAOptions(newDna))
-      //   editionCount++
-      //   abstractedIndexes.shift()
-      // } else {
-      //   console.log('DNA exists!')
-      //   failedCount++
-      //   if (failedCount >= uniqueDnaTorrance) {
-      //     console.log(
-      //       `You need more layers or elements to grow your edition to ${layerConfigurations[layerConfigIndex].growEditionSizeTo} artworks!`
-      //     )
-      //     process.exit()
-      //   }
-      // }
     }
     layerConfigIndex++
   }

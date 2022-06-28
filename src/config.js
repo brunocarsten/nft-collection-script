@@ -13,8 +13,9 @@ const baseUri = '' // This will be replaced automatically
 // If you have selected Solana then the collection starts from 0 automatically
 const layerConfigurations = [
   {
-    growEditionSizeTo: 20,
-    layersOrder: [{ name: 'background' }, { name: 'Animated Gold', gif: true }]
+    growEditionSizeTo: 6,
+    // growEditionSizeTo: 7680,
+    layersOrder: [{ name: 'background' }, { name: 'heads' }]
   }
 ]
 /* options: { blend: MODE.overlay } */
@@ -23,8 +24,8 @@ const shuffleLayerConfigurations = false
 const debugLogs = false
 
 const format = {
-  width: 1440,
-  height: 1440,
+  width: 512,
+  height: 512,
   smoothing: false
 }
 
