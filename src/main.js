@@ -5,6 +5,7 @@ const sha1 = require(`${basePath}/node_modules/sha1`)
 const { createCanvas, loadImage } = require(`${basePath}/node_modules/canvas`)
 const buildDir = `${basePath}/build`
 const layersDir = `${basePath}/layers`
+const { verify } = require('../constants/unallowed')
 const {
   format,
   baseUri,
@@ -176,15 +177,17 @@ const addAttributes = (_element) => {
 }
 
 const loadLayerImg = async (_layer, frame = false) => {
-  return new Promise(async (resolve) => {
-    const image = await loadImage(`${_layer.selectedElement.path}`)
+  if (_layer.selectedElement.filename.endsWith('.png')) {
+    return new Promise(async (resolve) => {
+      const image = await loadImage(`${_layer.selectedElement.path}`)
 
-    if (frame) {
-      resolve({ layer: _layer, loadedImage: image, frame: true })
-      return
-    }
-    resolve({ layer: _layer, loadedImage: image })
-  })
+      if (frame) {
+        resolve({ layer: _layer, loadedImage: image, frame: true })
+        return
+      }
+      resolve({ layer: _layer, loadedImage: image, frame: false })
+    })
+  }
 }
 
 const addText = (_sig, x, y, size) => {
@@ -196,8 +199,9 @@ const addText = (_sig, x, y, size) => {
 }
 
 const drawElement = (_renderObject) => {
-  ctx.globalAlpha = _renderObject.layer.opacity
-  ctx.globalCompositeOperation = _renderObject.layer.blend
+  // ctx.globalAlpha = _renderObject.layer.opacity
+  ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
   ctx.drawImage(_renderObject.loadedImage, 0, 0, format.width, format.height)
 
   addAttributes(_renderObject)
@@ -332,6 +336,8 @@ const startCreating = async () => {
         let loadedElements = []
 
         results.forEach((layer) => {
+          if (layer === undefined) return
+
           if (layer.selectedElement.filename.endsWith('.png')) {
             loadedElements.push(loadLayerImg(layer))
           } else {
@@ -343,8 +349,12 @@ const startCreating = async () => {
           }
         })
         await Promise.all(loadedElements).then((renderObjectArray) => {
+          const allowed = verify(renderObjectArray)
+          if (!allowed) return
+
           debugLogs ? console.log('Clearing canvas') : null
           ctx.clearRect(0, 0, format.width, format.height)
+          if (renderObjectArray[0].frame && renderObjectArray[renderObjectArray.length - 1].frame) return
           if (renderObjectArray[1].frame) {
             hashlipsGiffer = new HashlipsGiffer(
               canvas,
@@ -356,15 +366,28 @@ const startCreating = async () => {
             )
             hashlipsGiffer.start()
           }
+
           renderObjectArray.forEach((renderObject, index) => {
-            drawElement(renderObject, index, layerConfigurations[layerConfigIndex].layersOrder.length)
+            if (renderObject === undefined) return
+            drawElement(renderObject)
             if (renderObject.frame) {
               hashlipsGiffer.add()
             }
           })
+
+          const renderLastFrame = () => {
+            renderObjectArray[renderObjectArray.length - 1].layer.opacity = 1
+            renderObjectArray[renderObjectArray.length - 1].layer.blend = 'destination-over'
+            console.log(renderObjectArray[renderObjectArray.length - 1])
+            console.log('is frame')
+            drawElement(renderObjectArray[renderObjectArray.length - 1])
+          }
+          // renderObjectArray[renderObjectArray.length - 1].frame ? console.log('not frame') : renderLastFrame()
+
           if (renderObjectArray[1].frame) {
             hashlipsGiffer.stop()
           }
+
           debugLogs ? console.log('Editions left to create: ', abstractedIndexes) : null
           if (!renderObjectArray[1].frame) saveImage(abstractedIndexes[0])
           addMetadata(newDna, abstractedIndexes[0])
