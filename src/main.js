@@ -35,13 +35,16 @@ const HashlipsGiffer = require(`${basePath}/modules/HashlipsGiffer.js`)
 let hashlipsGiffer = null
 
 const buildSetup = () => {
+  if (fs.existsSync(`${buildDir}/images`)) return
+
   if (fs.existsSync(buildDir)) {
     fs.rmdirSync(buildDir, { recursive: true })
   }
+
   fs.mkdirSync(buildDir)
   fs.mkdirSync(`${buildDir}/json`)
   fs.mkdirSync(`${buildDir}/images`)
-  // fs.mkdirSync(`${buildDir}/gifs`)
+  fs.mkdirSync(`${buildDir}/gifs`)
 }
 
 const getRarityWeight = (_str) => {
@@ -313,16 +316,35 @@ const startCreating = async () => {
   let editionCount = 1
   let failedCount = 0
   let abstractedIndexes = []
+
+  const hasElements = fs.readdirSync(`${buildDir}/images`).length
+
+  const diff = hasElements + 925
+  // console.log(diff)
+  // return
+  // if (hasElements > 0) {
   for (
-    let i = network == NETWORK.sol ? 0 : 1;
+    let i = network == NETWORK.sol ? 0 : diff + 1;
     i <= layerConfigurations[layerConfigurations.length - 1].growEditionSizeTo;
     i++
   ) {
     abstractedIndexes.push(i)
   }
+
+  // } else {
+  //   for (
+  //     let i = network == NETWORK.sol ? 0 : 1;
+  //     i <= layerConfigurations[layerConfigurations.length - 1].growEditionSizeTo;
+  //     i++
+  //   ) {
+  //     abstractedIndexes.push(i)
+  //   }
+  // }
+
   if (shuffleLayerConfigurations) {
     abstractedIndexes = shuffle(abstractedIndexes)
   }
+
   debugLogs ? console.log('Editions left to create: ', abstractedIndexes) : null
   while (layerConfigIndex < layerConfigurations.length) {
     const layers = layersSetup(layerConfigurations[layerConfigIndex].layersOrder)
@@ -336,22 +358,24 @@ const startCreating = async () => {
         let loadedElements = []
 
         results.forEach((layer) => {
-          if (layer === undefined) return
+          if (layer === undefined || layer.selectedElement === undefined) return
 
           if (layer.selectedElement.filename.endsWith('.png')) {
             loadedElements.push(loadLayerImg(layer))
           } else {
             frames = getSubElements(layer.selectedElement.path)
             frames.forEach((frame) => {
+              console.log(frame)
               layer.selectedElement = frame
               loadedElements.push(loadLayerImg(layer, true))
             })
           }
         })
+        if (abstractedIndexes == '') return
         await Promise.all(loadedElements).then((renderObjectArray) => {
+          if (renderObjectArray.length < 2) return
           const allowed = verify(renderObjectArray)
           if (!allowed) return
-
           debugLogs ? console.log('Clearing canvas') : null
           ctx.clearRect(0, 0, format.width, format.height)
           if (renderObjectArray[0].frame && renderObjectArray[renderObjectArray.length - 1].frame) return
@@ -366,7 +390,6 @@ const startCreating = async () => {
             )
             hashlipsGiffer.start()
           }
-
           renderObjectArray.forEach((renderObject, index) => {
             if (renderObject === undefined) return
             drawElement(renderObject)
@@ -374,20 +397,9 @@ const startCreating = async () => {
               hashlipsGiffer.add()
             }
           })
-
-          const renderLastFrame = () => {
-            renderObjectArray[renderObjectArray.length - 1].layer.opacity = 1
-            renderObjectArray[renderObjectArray.length - 1].layer.blend = 'destination-over'
-            console.log(renderObjectArray[renderObjectArray.length - 1])
-            console.log('is frame')
-            drawElement(renderObjectArray[renderObjectArray.length - 1])
-          }
-          // renderObjectArray[renderObjectArray.length - 1].frame ? console.log('not frame') : renderLastFrame()
-
           if (renderObjectArray[1].frame) {
             hashlipsGiffer.stop()
           }
-
           debugLogs ? console.log('Editions left to create: ', abstractedIndexes) : null
           if (!renderObjectArray[1].frame) saveImage(abstractedIndexes[0])
           addMetadata(newDna, abstractedIndexes[0])

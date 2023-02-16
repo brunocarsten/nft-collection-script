@@ -11,10 +11,18 @@ const description = ''
 const baseUri = '' // This will be replaced automatically
 
 // If you have selected Solana then the collection starts from 0 automatically
+
+let hasElements
+if (fs.existsSync(`${basePath}/build/images`)) {
+  hasElements = fs.readdirSync(`${basePath}/build/images`).length
+}
+
+const diff = hasElements + 925
+const toCreate = 7
 const layerConfigurations = [
   {
-    growEditionSizeTo: 9999,
-    layersOrder: [{ name: 'background' }, { name: 'heads' }]
+    growEditionSizeTo: hasElements ? diff + toCreate : toCreate,
+    layersOrder: [{ name: 'heads' }, { name: 'background' }]
   }
 ]
 /* options: { blend: MODE.overlay } */
